@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BasicDigitRecognition": {
+      "commandName": "Project",
+      "commandLineArgs": "test Model.bin"
+    }
+  }
+}
