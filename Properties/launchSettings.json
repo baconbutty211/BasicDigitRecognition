@@ -2,7 +2,7 @@
   "profiles": {
     "BasicDigitRecognition": {
       "commandName": "Project",
-      "commandLineArgs": "test Model.bin"
+      "commandLineArgs": "create Model.bin 784 16 16 10"
     }
   }
 }

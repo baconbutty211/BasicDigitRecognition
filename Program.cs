@@ -2,15 +2,15 @@
 
 string binDirectoryPath = "C:\\Users\\jleis\\OneDrive - Durham University\\Documents\\Visual Studio 2022\\Projects\\BasicDigitRecognition\\bin\\Debug\\net6.0\\";
 string saveFilePath = binDirectoryPath + args[1];
-// [COMMAND] create save_path
+// [COMMAND] create save_path [...sizes...]
 if (args[0] == "create")
 {
-    // Example usage
-    int inputSize = 28 * 28; // Assuming 28x28 images
-    int hiddenSize = 64;
-    int outputSize = 10; // Digits 0-9
-
-    NeuralNetwork neuralNetwork = new NeuralNetwork(inputSize, hiddenSize, outputSize);
+    int[] sizes = new int[args.Length - 2];
+    for (int i = 2; i < args.Length; i++)
+    {
+        sizes[i - 2] = int.Parse(args[i]);
+    }
+    NeuralNetwork neuralNetwork = new NeuralNetwork(sizes);
 
     neuralNetwork.Save(saveFilePath);
 }

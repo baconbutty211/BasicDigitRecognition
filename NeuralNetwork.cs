@@ -13,37 +13,80 @@ namespace BasicDigitRecognition
     [Serializable]
     class NeuralNetwork
     {
-        private int inputSize;
-        private int hiddenSize;
-        private int outputSize;
-        private double[,] weightsInputHidden;
-        private double[,] weightsHiddenOutput;
+        //private int inputSize;
+        //private int hiddenSize;
+        //private int outputSize;
+        //private double[,] weightsInputHidden;
+        //private double[,] weightsHiddenOutput;
 
-        public NeuralNetwork(int inputSize, int hiddenSize, int outputSize)
+        //public NeuralNetwork(int inputSize, int hiddenSize, int outputSize)
+        //{
+        //    this.inputSize = inputSize;
+        //    this.hiddenSize = hiddenSize;
+        //    this.outputSize = outputSize;
+
+        //    // Initialize weights with random values
+        //    weightsInputHidden = InitializeWeights(inputSize, hiddenSize);
+        //    weightsHiddenOutput = InitializeWeights(hiddenSize, outputSize);
+        //}
+
+        //private double[,] InitializeWeights(int rows, int cols)
+        //{
+        //    Random rand = new Random();
+        //    double[,] weights = new double[rows, cols];
+
+        //    for (int i = 0; i < rows; i++)
+        //    {
+        //        for (int j = 0; j < cols; j++)
+        //        {
+        //            weights[i, j] = rand.NextDouble() * 2 - 1; // Initialize weights between -1 and 1
+        //        }
+        //    }
+
+        //    return weights;
+        //}
+
+        private List<int> layerSizes;
+        private List<double[,]> weights;
+        private List<double[]> biases;
+        public NeuralNetwork(params int[] layerSizes)
         {
-            this.inputSize = inputSize;
-            this.hiddenSize = hiddenSize;
-            this.outputSize = outputSize;
-
-            // Initialize weights with random values
-            weightsInputHidden = InitializeWeights(inputSize, hiddenSize);
-            weightsHiddenOutput = InitializeWeights(hiddenSize, outputSize);
-        }
-
-        private double[,] InitializeWeights(int rows, int cols)
-        {
-            Random rand = new Random();
-            double[,] weights = new double[rows, cols];
-
-            for (int i = 0; i < rows; i++)
+            if (layerSizes.Length < 2)
             {
-                for (int j = 0; j < cols; j++)
-                {
-                    weights[i, j] = rand.NextDouble() * 2 - 1; // Initialize weights between -1 and 1
-                }
+                throw new ArgumentException("Neural network must have at least input and output layers.");
             }
 
-            return weights;
+            this.layerSizes = layerSizes.ToList();
+            InitializeWeightsAndBiases();
+        }
+
+        private void InitializeWeightsAndBiases()
+        {
+            int numLayers = layerSizes.Count;
+            weights = new List<double[,]>();
+            biases = new List<double[]>();
+
+            Random random = new Random();
+            for (int i = 1; i < numLayers; i++)
+            {
+                int inputSize = layerSizes[i - 1];
+                int outputSize = layerSizes[i];
+
+                double[,] weight = new double[inputSize, outputSize];
+                double[] bias = new double[outputSize];
+
+                for (int j = 0; j < outputSize; j++)
+                {
+                    bias[j] = random.NextDouble() * 2 - 1; // Initialize biases between -1 and 1
+                    for (int k = 0; k < inputSize; k++)
+                    {
+                        weight[k,j] = random.NextDouble() * 2 - 1; // Initialize weights between -1 and 1
+                    }
+                }
+
+                weights.Add(weight);
+                biases.Add(bias);
+            }
         }
 
         private double[] Softmax(double[] x)
@@ -62,15 +105,16 @@ namespace BasicDigitRecognition
 
         private double[] Forward(double[] input)
         {
-            // Calculate input to hidden layer
-            double[] hiddenInput = VectorMatrixMultiply(input, weightsInputHidden);
-            double[] hiddenOutput = Sigmoid(hiddenInput);
+            double[] currentInput = input;
 
-            // Calculate hidden to output layer
-            double[] finalInput = VectorMatrixMultiply(hiddenOutput, weightsHiddenOutput);
-            double[] finalOutput = Softmax(finalInput);
+            for (int i = 0; i < weights.Count; i++)
+            {
+                double[] layerOutput = VectorMatrixMultiply(currentInput, weights[i]);
+                layerOutput = layerOutput.Zip(biases[i], (x, b) => x + b).ToArray(); // Add biases
+                currentInput = Sigmoid(layerOutput);
+            }
 
-            return finalOutput;
+            return currentInput;
         }
 
         private double[] VectorMatrixMultiply(double[] vector, double[,] matrix)
@@ -79,9 +123,9 @@ namespace BasicDigitRecognition
             int cols = matrix.GetLength(1);
             double[] result = new double[cols];
 
-            for (int j = 0; j < cols; j++)
+            for (int i = 0; i < rows; i++)
             {
-                for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
                 {
                     result[j] += vector[i] * matrix[i, j];
                 }
@@ -92,40 +136,54 @@ namespace BasicDigitRecognition
 
         private void Backpropagation(double[] input, double[] target, double learningRate)
         {
-            // Forward pass
-            double[] hiddenInput = VectorMatrixMultiply(input, weightsInputHidden);
-            double[] hiddenOutput = Sigmoid(hiddenInput);
-            double[] finalInput = VectorMatrixMultiply(hiddenOutput, weightsHiddenOutput);
-            double[] finalOutput = Softmax(finalInput);
+            // Feed Forward
+            List<double[]> inputs = new List<double[]>();
+            List<double[]> outputs = new List<double[]>();
+            double[] currentInput = input;
+            for (int i = 0; i < weights.Count; i++)
+            {
+                inputs.Add(currentInput);
+
+                double[] layerOutput = VectorMatrixMultiply(currentInput, weights[i]); // Multiply input by weights
+                layerOutput = layerOutput.Zip(biases[i], (x, b) => x + b).ToArray(); // Add biases
+                currentInput = (i == weights.Count - 1) ? Softmax(layerOutput) : Sigmoid(layerOutput); // Activate layerOutput
+
+                outputs.Add(currentInput);
+            }
 
             // Calculate output layer error
-            double[] outputError = new double[outputSize];
-            for (int i = 0; i < outputSize; i++)
+            List<double[]> errors = new List<double[]>();
+            double[] finalOutput = outputs[outputs.Count - 1];
+            double[] outputError = new double[finalOutput.Length];
+            for (int i = 0; i < finalOutput.Length; i++)
             {
                 outputError[i] = finalOutput[i] - target[i];
             }
+            errors.Add(outputError);
 
             // Calculate hidden layer error
-            double[] hiddenError = VectorMatrixMultiply(outputError, Transpose(weightsHiddenOutput));
-            for (int i = 0; i < hiddenSize; i++)
+            for (int i = outputs.Count - 2; i >= 0; i--)
             {
-                hiddenError[i] *= hiddenOutput[i] * (1 - hiddenOutput[i]);
-            }
+                double[] hiddenOutput = outputs[i]; // Previous layer errors
 
-            // Update weights
-            for (int i = 0; i < inputSize; i++)
-            {
-                for (int j = 0; j < hiddenSize; j++)
+                double[] hiddenError = VectorMatrixMultiply(errors[0] /* Previous layer error */, Transpose(weights[i+1]));
+                for (int j = 0; j < hiddenOutput.Length; j++)
                 {
-                    weightsInputHidden[i, j] -= learningRate * hiddenError[j] * input[i];
+                    hiddenError[j] *= hiddenOutput[j] * (1 - hiddenOutput[j]);
                 }
+                errors.Insert(0, hiddenError); // Inserting so that the previous layer of errors is always at index 0 (and remains in layer order).
             }
 
-            for (int i = 0; i < hiddenSize; i++)
+            // Update weights & biases
+            for (int h = 0; h < weights.Count; h++)
             {
-                for (int j = 0; j < outputSize; j++)
+                for (int i = 0; i < layerSizes[h+1]; i++)
                 {
-                    weightsHiddenOutput[i, j] -= learningRate * outputError[j] * hiddenOutput[i];
+                    for (int j = 0; j < layerSizes[h]; j++)
+                    {
+                        weights[h][j, i] -= learningRate * errors[h][i] * inputs[h][j]; // Update weights
+                    }
+                    biases[h][i] -= learningRate * errors[h][i]; // Update biases
                 }
             }
         }
@@ -221,6 +279,16 @@ namespace BasicDigitRecognition
                 BinaryFormatter formatter = new BinaryFormatter();
                 return (NeuralNetwork)formatter.Deserialize(stream);
             }
+        }
+
+        public override string ToString()
+        {
+            string neuralNetworkArchitecture = "Neural Network Architecture:";
+            for (int i = 0; i < layerSizes.Count; i++)
+            {
+                neuralNetworkArchitecture += $"Layer {i + 1}: {layerSizes[i]} neurons";
+            }
+            return neuralNetworkArchitecture;
         }
     }
 }
